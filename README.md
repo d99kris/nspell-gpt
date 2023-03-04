@@ -8,7 +8,7 @@ nspell-gpt
 The nspell-gpt utility utilizes OpenAI's ChatGPT to provide users with
 spell and grammar checking features as well as other text editing
 capabilities. Its TUI interface is loosely inspired by aspell. Example
-using the rephrase tool:
+using the **rephrase** tool:
 
 ![screenshot nspell-gpt](/doc/screenshot-nspell-gpt.png)
 
