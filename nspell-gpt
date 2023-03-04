@@ -1,0 +1,328 @@
+#!/usr/bin/env python3
+
+# nspell-gpt
+#
+# Copyright (c) 2023 Kristofer Berggren
+# All rights reserved.
+#
+# nspell-gpt is distributed under the MIT license, see LICENSE for details.
+
+import argparse
+import os
+import re
+import requests
+import signal
+import sys
+
+
+# App details
+class app:
+    name = "nspell-gpt"
+    version = "v0.01"
+    author = "Kristofer Berggren"
+    copyright = "Copyright (c) 2023 " + author
+    license = name + " is distributed under the MIT license."
+    written = "Written by " + author + "."
+    conf_dir = os.environ.get("HOME") + "/.config/" + name
+    api_conf_path = conf_dir + "/api.conf"
+    tools_conf_path = conf_dir + "/tools.conf"
+
+
+# Tools / prompts
+skip_result = "NOCHANGE"
+tools = { }
+
+tools["spell"] = "Correct this to standard {lang} and return \"" + skip_result + "\" if there are no changes:"
+tools["rephrase"] = "Suggest three alternative ways to phrase this sentence in standard {lang}:"
+tools["formal"] = "Rephrase the following sentence in {lang} using very formal language:"
+tools["legal"] = "Rephrase the following sentence in {lang} using legal language:"
+tools["short"] = "Rephrase the following sentence in {lang} as short as possible:"
+tools["gentle"] = "Rephrase the following sentence in {lang} using gentle and kind language:"
+
+tools["absurd"] = "Rephrase the following sentence in {lang} using absurd comedy:"
+tools["pirate"] = "Rephrase the following sentence in {lang} using funny pirate language:"
+tools["bible"] = "Rephrase the following sentence in {lang} using Biblical language:"
+tools["truly"] = "Rephrase the following sentence in {lang} using the word truly at least once:"
+tools["savannah"] = "Rephrase the following sentence in {lang} using typical Savannah phrases:"
+tools["singlish"] = "Rephrase the following sentence in {lang} using typical Singlish expressions:"
+tools["aussie"] = "Rephrase the following sentence in {lang} using typical Australian expressions:"
+tools["grand"] = "Rephrase the following sentence in {lang} using grand bombastic language:"
+tools["airplane"] = "Rephrase the following sentence in {lang} using deadpan jokes in the style of the movie Airplane (1980):"
+tools["idiom"] = "Rephrase the following sentence in {lang} using idioms and common expressions:"
+tools["vague"] = "Rephrase the following sentence in {lang} using very vague language:"
+
+
+# Term utils
+class term:
+    clear = "\033[3J\033[H\033[2J"
+    title = "\033[7m"
+    normal = "\033[0m"
+    nl = "\n"
+
+def width():
+    size = os.get_terminal_size()
+    return size.columns
+
+def height():
+    size = os.get_terminal_size()
+    return size.lines
+
+def clear():
+    sys.stdout.write(term.clear)
+
+def title():
+    title_text = (" " + app.name + " " + app.version)
+    title_text_pad = title_text.ljust(width(), " ")
+    sys.stdout.write(term.title + title_text_pad + term.normal + term.nl)
+
+def newline():
+    sys.stdout.write(term.nl)
+
+def puts(s):
+    sys.stdout.write(s)
+
+def putline(s):
+    sys.stdout.write(s + term.nl)
+
+
+# File utils
+def read_config(conf_path):
+    config = {}
+    if os.path.isfile(conf_path):
+        with open(conf_path) as conf_file:
+            for line in conf_file:
+                if line and line[0] != "#":
+                    name, var = line.partition("=")[::2]
+                    config[name.strip()] = var.strip()
+
+    return config
+
+
+# Config
+api_conf = read_config(app.api_conf_path)
+tools_conf = read_config(app.tools_conf_path)
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+if not OPENAI_API_KEY:
+    OPENAI_API_KEY = api_conf.get("OPENAI_API_KEY")
+
+
+# OpenAI utils
+def split_content(content, original):
+    lines = content.split("\n")
+    lines = [line for line in lines if line.strip()]
+    results = [ ]
+    for line in lines:
+        clean_line = line
+        orig_prefix = re.findall("^\d+\.", original)
+        prefix = re.findall("^\d+\.", line)
+        if prefix and not orig_prefix:
+            clean_line = line[len(prefix) + 1:].strip()
+
+        results.append(clean_line)
+
+    return results
+
+
+# OpenAI GPT
+def chat_request(prompt, original):
+    url = "https://api.openai.com/v1/chat/completions"
+    headers = { "Authorization": "Bearer " + OPENAI_API_KEY, "Content-Type": "application/json"}
+    data = { "model": "gpt-3.5-turbo",
+             "messages": [ { "role": "user", "content": prompt } ] }
+    result = requests.post(url, headers=headers, json=data)
+    json = result.json()
+    responses = []
+    for choice in json["choices"]:
+        message = choice["message"]
+        content = message["content"]
+        lines = split_content(content, original)
+        for line in lines:
+            responses.append(line)
+
+    return responses
+
+
+# Process sentence
+def process_sentence(sentence, language, tool, accept):
+    sentence_prompt = tools[tool].replace("{lang}", language) + "\n" + sentence
+    new_sentences = chat_request(sentence_prompt, sentence)
+    new_sentences = [sentence for sentence in new_sentences if skip_result not in sentence]
+
+    if not new_sentences:
+        return sentence
+
+    if accept:
+        return new_sentences[0]
+
+    clear()
+    title()
+    newline()
+    putline("Original:")
+    newline()
+    options = {}
+    putline(str(0) + ") " + sentence)
+    newline()
+    if len(new_sentences) > 1:
+        putline("Suggestions:")
+    else:
+        putline("Suggestion:")
+
+    newline()
+    count = 1
+    for new_sentence in new_sentences:
+        putline(str(count) + ") " + new_sentence)
+        newline()
+        options[count] = new_sentence
+        count = count + 1
+
+    default = "1"
+    selection = input("> ") or default
+
+    if selection and selection.isdigit() and int(selection) in options:
+        return options[int(selection)]
+    else:
+        return sentence
+
+
+# Process path
+def process_path(path, tool, accept):
+    datastr = ""
+    try:
+        with open(path) as datafile:
+            datastr = datafile.read()
+    except:
+        print("Cannot read " + path)
+        sys.exit(1)
+
+    if not datastr:
+        print("Input file " + path + " empty")
+        sys.exit(1)
+
+    language_prompt = "Specify the language of the following text:\n" + datastr
+    languages = chat_request(language_prompt, "")
+    if not languages:
+        print("Unable to determine language of " + path)
+        sys.exit(1)
+
+    language = languages[0]
+    # @todo: consider sanity checking / cleaning up language response.
+
+    result = ""
+    sentences = datastr.replace("\n", " ").replace("\r", "").split(".")
+    for sentence in sentences:
+        clean_sentence = sentence.strip()
+        if not clean_sentence:
+            continue
+
+        new_sentence = process_sentence(clean_sentence + ".", language, tool, accept)
+        if result:
+            result = result + " "
+
+        result = result + new_sentence.strip()
+
+    if not result:
+        print("Result empty")
+        sys.exit(1)
+
+    try:
+        result = result + "\n"
+        with open(path, "w") as datafile:
+            datafile.write(result)
+    except:
+        print("Cannot write " + path)
+        sys.exit(1)
+
+
+# Select Tool
+def select_tool():
+    clear()
+    title()
+    newline()
+    putline("Tools:")
+    options = {}
+    tool_names = ["abort"] + list(tools)
+    item_width = 20
+    per_row = int(width() / item_width)
+    count = 1
+    for tool_index in range(0, len(tool_names)):
+        if (tool_index % per_row) == 0:
+            newline()
+
+        tool = tool_names[tool_index]
+        tool_option = (str(tool_index).rjust(3, " ") + ") " + tool).ljust(item_width, " ")
+        puts(tool_option)
+        if tool_index > 0:
+            options[tool_index] = tool
+
+    newline()
+    newline()
+    selection = input("> ")
+    if selection and selection.isdigit() and int(selection) in options:
+        return options[int(selection)]
+    else:
+        return ""
+
+
+# Signals
+def signal_handler(sig, frame):
+    print("Aborting")
+    sys.exit(1)
+
+
+# Main
+def main(argv):
+    tool_list = ", ".join(tools.keys())
+    parser = argparse.ArgumentParser(
+        description=app.name + " is a command-line tool using OpenAI Chat " +
+        "to provide spell checking, rephrasing and text editing help. ")
+    parser.add_argument("-a", "--accept", action="store_true",
+                        help="non-interactive use (accepting first suggestion)")
+    parser.add_argument("-p", "--path", dest="path",
+                        help="file to check and modify")
+    parser.add_argument("-t", "--tool", dest="tool",
+                        help="list of tools: " + tool_list)
+    parser.add_argument("-v", "--version", action="store_true",
+                        help="show version")
+    arguments = vars(parser.parse_args())
+
+    tools.update(tools_conf)
+
+    accept = arguments["accept"]
+    path = arguments["path"]
+    tool = arguments["tool"]
+    version = arguments["version"]
+
+    if version:
+        print(app.name + " " + app.version)
+        print("")
+        print(app.copyright)
+        print("")
+        print(app.license)
+        sys.exit(0)
+
+    if not OPENAI_API_KEY:
+        print("OPENAI_API_KEY not set up. Please set the API key in ")
+        print(app.api_conf_path)
+        print("by adding a line on the following format:")
+        print("OPENAI_API_KEY=sk-....")
+        print("")
+        print("Alternatively call " + app.name + " with the environment variable set, example:")
+        print("OPENAI_API_KEY=sk-.... " + app.name)
+        sys.exit(1)
+
+    if not path:
+        parser.print_help()
+        sys.exit(1)
+
+    if not tool:
+        tool = select_tool()
+        if not tool:
+            print("Aborting")
+            sys.exit(1)
+
+    process_path(path, tool, accept)
+    sys.exit(0)
+
+if __name__ == "__main__":
+    signal.signal(signal.SIGINT, signal_handler)
+    main(sys.argv)
