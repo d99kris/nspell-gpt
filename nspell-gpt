@@ -18,7 +18,7 @@ import sys
 # App details
 class app:
     name = "nspell-gpt"
-    version = "v0.01"
+    version = "v0.02"
     author = "Kristofer Berggren"
     copyright = "Copyright (c) 2023 " + author
     license = name + " is distributed under the MIT license."
@@ -77,12 +77,15 @@ def title():
 
 def newline():
     sys.stdout.write(term.nl)
+    sys.stdout.flush()
 
 def puts(s):
     sys.stdout.write(s)
+    sys.stdout.flush()
 
 def putline(s):
     sys.stdout.write(s + term.nl)
+    sys.stdout.flush()
 
 
 # File utils
@@ -176,7 +179,8 @@ def process_sentence(sentence, language, tool, accept):
         count = count + 1
 
     default = "1"
-    selection = input("> ") or default
+    puts("> ")
+    selection = input("") or default
 
     if selection and selection.isdigit() and int(selection) in options:
         return options[int(selection)]
@@ -256,7 +260,8 @@ def select_tool():
 
     newline()
     newline()
-    selection = input("> ")
+    puts("> ")
+    selection = input("")
     if selection and selection.isdigit() and int(selection) in options:
         return options[int(selection)]
     else:
