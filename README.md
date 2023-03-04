@@ -55,7 +55,7 @@ Installation
 
 Supported Platforms
 ===================
-nspell-gpt is implemented using Python 3, and tested on Linux and macOS.
+nspell-gpt is implemented using Python 3 and tested on Linux and macOS.
 
 
 Pre-requisites
