@@ -40,10 +40,6 @@ Command-line Options:
 
 Installation
 ============
-**Dependencies**
-
-    sudo hooh
-
 **Source**
 
     git clone https://github.com/d99kris/nspell-gpt && cd nspell-gpt
