@@ -18,7 +18,7 @@ import sys
 # App details
 class app:
     name = "nspell-gpt"
-    version = "v0.02"
+    version = "v0.03"
     author = "Kristofer Berggren"
     copyright = "Copyright (c) 2023 " + author
     license = name + " is distributed under the MIT license."
@@ -282,18 +282,17 @@ def main(argv):
         "to provide spell checking, rephrasing and text editing help. ")
     parser.add_argument("-a", "--accept", action="store_true",
                         help="non-interactive use (accepting first suggestion)")
-    parser.add_argument("-p", "--path", dest="path",
-                        help="file to check and modify")
     parser.add_argument("-t", "--tool", dest="tool",
                         help="list of tools: " + tool_list)
     parser.add_argument("-v", "--version", action="store_true",
                         help="show version")
+    parser.add_argument("FILE", nargs='?', help="file to check and modify")
     arguments = vars(parser.parse_args())
 
     tools.update(tools_conf)
 
     accept = arguments["accept"]
-    path = arguments["path"]
+    path = arguments["FILE"]
     tool = arguments["tool"]
     version = arguments["version"]
 

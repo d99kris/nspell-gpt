@@ -16,7 +16,7 @@ Usage
 =====
 Usage:
 
-    usage: nspell-gpt [-h] [-a] [-p PATH] [-t TOOL] [-v]
+    usage: nspell-gpt [-h] [-a] [-t TOOL] [-v] FILE
 
 Command-line Options:
 
@@ -26,15 +26,14 @@ Command-line Options:
     -a, --accept
            non-interactive use (accepting first suggestion)
 
-    -p PATH, --path PATH
-           file to check and modify
-
     -t TOOL, --tool TOOL
            list of tools: spell, rephrase, formal, legal, short, gentle, absurd, pirate, bible,
            truly, savannah, singlish, aussie, grand, airplane, idiom, vague
 
     -v, --version
            show version
+
+    FILE   file to check and modify
 
 
 Installation
