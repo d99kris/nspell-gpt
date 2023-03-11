@@ -18,7 +18,7 @@ import sys
 # App details
 class app:
     name = "nspell-gpt"
-    version = "v0.03"
+    version = "v0.04"
     author = "Kristofer Berggren"
     copyright = "Copyright (c) 2023 " + author
     license = name + " is distributed under the MIT license."
@@ -325,6 +325,7 @@ def main(argv):
             sys.exit(1)
 
     process_path(path, tool, accept)
+    clear()
     sys.exit(0)
 
 if __name__ == "__main__":
