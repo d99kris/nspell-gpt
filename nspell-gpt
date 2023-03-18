@@ -8,6 +8,7 @@
 # nspell-gpt is distributed under the MIT license, see LICENSE for details.
 
 import argparse
+import concurrent.futures
 import os
 import re
 import requests
@@ -18,7 +19,7 @@ import sys
 # App details
 class app:
     name = "nspell-gpt"
-    version = "v0.05"
+    version = "v0.06"
     author = "Kristofer Berggren"
     copyright = "Copyright (c) 2023 " + author
     license = name + " is distributed under the MIT license."
@@ -216,7 +217,9 @@ def process_path(path, tool, accept):
     language = languages[0]
     # @todo: consider sanity checking / cleaning up language response.
 
-    result = ""
+    executor = concurrent.futures.ThreadPoolExecutor(3)
+
+    clean_sentences = []
     sentences = datastr.replace("\n", " ").replace("\r", "").split(".")
     for sentence in sentences:
         clean_sentence = sentence.strip()
@@ -224,8 +227,22 @@ def process_path(path, tool, accept):
             continue
 
         clean_sentence = clean_sentence + "."
+        clean_sentences.append(clean_sentence)
 
-        new_sentences = process_sentence(clean_sentence, language, tool)
+    result = ""
+    next_process = True
+    for idx, clean_sentence in enumerate(clean_sentences):
+
+        if idx == 0:
+            current_process = executor.submit(process_sentence, clean_sentences[idx], language, tool)
+        else:
+            current_process = next_process
+
+        nextidx = idx + 1
+        if nextidx < len(clean_sentences):
+            next_process = executor.submit(process_sentence, clean_sentences[nextidx], language, tool)
+
+        new_sentences = current_process.result()
 
         new_sentence = prompt_sentences(new_sentences, clean_sentence, accept)
         if result:
