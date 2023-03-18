@@ -18,7 +18,7 @@ import sys
 # App details
 class app:
     name = "nspell-gpt"
-    version = "v0.04"
+    version = "v0.05"
     author = "Kristofer Berggren"
     copyright = "Copyright (c) 2023 " + author
     license = name + " is distributed under the MIT license."
@@ -146,9 +146,14 @@ def chat_request(prompt, original):
 
 
 # Process sentence
-def process_sentence(sentence, language, tool, accept):
+def process_sentence(sentence, language, tool):
     sentence_prompt = tools[tool].replace("{lang}", language) + "\n" + sentence
     new_sentences = chat_request(sentence_prompt, sentence)
+    return new_sentences
+
+
+# Prompt sentence
+def prompt_sentences(new_sentences, sentence, accept):
     new_sentences = [sentence for sentence in new_sentences if skip_result not in sentence]
 
     if not new_sentences:
@@ -218,7 +223,11 @@ def process_path(path, tool, accept):
         if not clean_sentence:
             continue
 
-        new_sentence = process_sentence(clean_sentence + ".", language, tool, accept)
+        clean_sentence = clean_sentence + "."
+
+        new_sentences = process_sentence(clean_sentence, language, tool)
+
+        new_sentence = prompt_sentences(new_sentences, clean_sentence, accept)
         if result:
             result = result + " "
 
