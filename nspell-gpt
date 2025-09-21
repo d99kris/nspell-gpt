@@ -9,17 +9,88 @@
 
 import argparse
 import concurrent.futures
+import http
+import http.client
+import json
 import os
 import re
-import requests
 import signal
 import sys
+import urllib
+import urllib.parse
+
+
+# HttpResponse, get() and post() below constitutes a poor man's 'requests' replacement
+class HttpResponse:
+    def __init__(self, status_code, headers, text):
+        self.status_code = status_code
+        self.headers = headers
+        self.text = text
+
+
+def get(url, headers=None):
+    if headers is None:
+        headers = {}
+
+    # Parse the URL
+    parsed_url = urllib.parse.urlparse(url)
+    connection = http.client.HTTPSConnection(parsed_url.netloc) if parsed_url.scheme == 'https' else http.client.HTTPConnection(parsed_url.netloc)
+
+    # Construct the path with query parameters if any
+    path = parsed_url.path
+    if parsed_url.query:
+        path += '?' + parsed_url.query
+
+    # Send the GET request
+    connection.request("GET", path, headers=headers)
+
+    # Get the response
+    response = connection.getresponse()
+    response_data = response.read().decode()
+
+    # Close the connection
+    connection.close()
+
+    return HttpResponse(response.status, response.getheaders(), response_data)
+
+
+def post(url, data, headers=None):
+    if headers is None:
+        headers = {"Content-Type": "application/json"}
+
+    # Parse the URL
+    parsed_url = urllib.parse.urlparse(url)
+    connection = http.client.HTTPSConnection(parsed_url.netloc) if parsed_url.scheme == 'https' else http.client.HTTPConnection(parsed_url.netloc)
+
+    # Encode the data
+    if headers.get("Content-Type") == "application/x-www-form-urlencoded":
+        if isinstance(data, dict):
+            data = urllib.parse.urlencode(data)
+        data = data.encode('utf-8')
+    elif headers.get("Content-Type") == "application/json":
+        if isinstance(data, dict):
+            data = json.dumps(data)
+        data = data.encode('utf-8')
+    else:
+        raise ValueError("Unsupported Content-Type")
+
+    # Send the POST request
+    connection.request("POST", parsed_url.path, body=data, headers=headers)
+
+    # Get the response
+    response = connection.getresponse()
+    response_data = response.read().decode()
+
+    # Close the connection
+    connection.close()
+
+    return HttpResponse(response.status, response.getheaders(), response_data)
 
 
 # App details
 class app:
     name = "nspell-gpt"
-    version = "v0.07"
+    version = "v0.08"
     author = "Kristofer Berggren"
     copyright = "Copyright (c) 2023-2025 " + author
     license = name + " is distributed under the MIT license."
@@ -133,10 +204,10 @@ def chat_request(prompt, original):
     headers = { "Authorization": "Bearer " + OPENAI_API_KEY, "Content-Type": "application/json"}
     data = { "model": "gpt-3.5-turbo",
              "messages": [ { "role": "user", "content": prompt } ] }
-    result = requests.post(url, headers=headers, json=data)
-    json = result.json()
+    result = post(url, data, headers=headers)
+    jsondata = json.loads(result.text)
     responses = []
-    for choice in json["choices"]:
+    for choice in jsondata["choices"]:
         message = choice["message"]
         content = message["content"]
         lines = split_content(content, original)
